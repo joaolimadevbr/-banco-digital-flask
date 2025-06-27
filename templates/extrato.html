@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Extrato - Banco Digital{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list me-2"></i>Extrato - Conta {{ conta.tipo.title() }}
+                    </h5>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left me-1"></i>Voltar
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">ID da Conta</h6>
+                                <h4 class="text-primary">{{ conta.id }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">Tipo</h6>
+                                <h4 class="text-info">{{ conta.tipo.title() }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">Saldo Atual</h6>
+                                <h4 class="text-success">R$ {{ "%.2f"|format(conta.saldo) }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="mb-3">
+                    <i class="fas fa-history me-2"></i>Histórico de Transações
+                </h6>
+
+                {% if transacoes %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Tipo</th>
+                                    <th>Descrição</th>
+                                    <th>Valor</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transacao in transacoes %}
+                                    <tr>
+                                        <td>{{ transacao.data.strftime('%d/%m/%Y %H:%M') }}</td>
+                                        <td>
+                                            {% if transacao.tipo == 'deposito' %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-plus me-1"></i>Depósito
+                                                </span>
+                                            {% elif transacao.tipo == 'saque' %}
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-minus me-1"></i>Saque
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-info">
+                                                    <i class="fas fa-exchange-alt me-1"></i>{{ transacao.tipo.title() }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ transacao.descricao }}</td>
+                                        <td>
+                                            <span class="text-{{ 'success' if transacao.tipo == 'deposito' else 'danger' }}">
+                                                {{ '+' if transacao.tipo == 'deposito' else '-' }}R$ {{ "%.2f"|format(transacao.valor) }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check me-1"></i>Concluído
+                                            </span>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhuma transação encontrada</h5>
+                        <p class="text-muted">Esta conta ainda não possui transações registradas</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Depósito - Banco Digital{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card">
+            <div class="card-body p-4">
+                <h2 class="text-center mb-4">
+                    <i class="fas fa-plus-circle text-success"></i>
+                    Depósito
+                </h2>
+                
+                <div class="alert alert-info mb-4">
+                    <h6><i class="fas fa-info-circle me-2"></i>Informações da Conta:</h6>
+                    <p class="mb-1"><strong>Tipo:</strong> {{ conta.tipo.title() }}</p>
+                    <p class="mb-1"><strong>ID:</strong> {{ conta.id }}</p>
+                    <p class="mb-0"><strong>Saldo Atual:</strong> R$ {{ "%.2f"|format(conta.saldo) }}</p>
+                </div>
+                
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="valor" class="form-label">Valor do Depósito</label>
+                        <div class="input-group">
+                            <span class="input-group-text">R$</span>
+                            <input type="number" class="form-control" id="valor" name="valor" 
+                                   step="0.01" min="0.01" placeholder="0.00" required>
+                        </div>
+                        <div class="form-text">Digite o valor que deseja depositar</div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-plus-circle me-2"></i>Confirmar Depósito
+                        </button>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Voltar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

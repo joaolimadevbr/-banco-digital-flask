@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Saque - Banco Digital{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card">
+            <div class="card-body p-4">
+                <h2 class="text-center mb-4">
+                    <i class="fas fa-minus-circle text-warning"></i>
+                    Saque
+                </h2>
+                
+                <div class="alert alert-info mb-4">
+                    <h6><i class="fas fa-info-circle me-2"></i>Informações da Conta:</h6>
+                    <p class="mb-1"><strong>Tipo:</strong> {{ conta.tipo.title() }}</p>
+                    <p class="mb-1"><strong>ID:</strong> {{ conta.id }}</p>
+                    <p class="mb-0"><strong>Saldo Disponível:</strong> R$ {{ "%.2f"|format(conta.saldo) }}</p>
+                </div>
+                
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="valor" class="form-label">Valor do Saque</label>
+                        <div class="input-group">
+                            <span class="input-group-text">R$</span>
+                            <input type="number" class="form-control" id="valor" name="valor" 
+                                   step="0.01" min="0.01" max="{{ conta.saldo }}" placeholder="0.00" required>
+                        </div>
+                        <div class="form-text">Digite o valor que deseja sacar (máximo: R$ {{ "%.2f"|format(conta.saldo) }})</div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-minus-circle me-2"></i>Confirmar Saque
+                        </button>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Voltar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

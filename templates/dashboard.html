@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Banco Digital{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="h3">
+            <i class="fas fa-home text-primary"></i>
+            Bem-vindo, {{ usuario.nome }}!
+        </h1>
+        <p class="text-muted">Gerencie suas contas e transações</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-wallet fa-2x text-primary mb-2"></i>
+                <h5 class="card-title">Total de Contas</h5>
+                <h3 class="text-primary">{{ contas|length }}</h3>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-dollar-sign fa-2x text-success mb-2"></i>
+                <h5 class="card-title">Saldo Total</h5>
+                <h3 class="text-success">R$ {{ "%.2f"|format(contas|sum(attribute='saldo')) }}</h3>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-plus-circle fa-2x text-info mb-2"></i>
+                <h5 class="card-title">Nova Conta</h5>
+                <a href="{{ url_for('criar_conta') }}" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-plus me-1"></i>Criar
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-chart-bar fa-2x text-warning mb-2"></i>
+                <h5 class="card-title">Relatórios</h5>
+                <button class="btn btn-outline-warning btn-sm" disabled>
+                    <i class="fas fa-chart-bar me-1"></i>Em breve
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-credit-card me-2"></i>Suas Contas
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if contas %}
+                    <div class="row">
+                        {% for conta in contas %}
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-3">
+                                            <div>
+                                                <h6 class="card-title mb-1">
+                                                    <i class="fas fa-{{ 'university' if conta.tipo == 'corrente' else 'piggy-bank' }} me-2"></i>
+                                                    Conta {{ conta.tipo.title() }}
+                                                </h6>
+                                                <small class="text-muted">ID: {{ conta.id }}</small>
+                                            </div>
+                                            <span class="badge bg-{{ 'primary' if conta.tipo == 'corrente' else 'success' }}">
+                                                {{ conta.tipo.title() }}
+                                            </span>
+                                        </div>
+                                        
+                                        <h4 class="text-primary mb-3">R$ {{ "%.2f"|format(conta.saldo) }}</h4>
+                                        
+                                        <div class="btn-group-vertical w-100" role="group">
+                                            <a href="{{ url_for('deposito', conta_id=conta.id) }}" class="btn btn-success btn-sm mb-1">
+                                                <i class="fas fa-plus me-1"></i>Depositar
+                                            </a>
+                                            <a href="{{ url_for('saque', conta_id=conta.id) }}" class="btn btn-warning btn-sm mb-1">
+                                                <i class="fas fa-minus me-1"></i>Sacar
+                                            </a>
+                                            <a href="{{ url_for('extrato', conta_id=conta.id) }}" class="btn btn-info btn-sm">
+                                                <i class="fas fa-list me-1"></i>Extrato
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-credit-card fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Você ainda não tem contas</h5>
+                        <p class="text-muted">Crie sua primeira conta para começar a usar o banco digital</p>
+                        <a href="{{ url_for('criar_conta') }}" class="btn btn-primary">
+                            <i class="fas fa-plus me-2"></i>Criar Primeira Conta
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
