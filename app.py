@@ -324,9 +324,15 @@ def extrato(conta_id):
                 flash('Acesso negado!', 'error')
                 return redirect(url_for('dashboard'))
             
-            # Busca transações
-            cursor = db.execute('SELECT * FROM transacao WHERE conta_id = ? ORDER BY data DESC',
-                              (conta_id,))
+            # Busca transações com formatação de data
+            cursor = db.execute('''
+                SELECT 
+                    id, tipo, valor, descricao, conta_id,
+                    strftime('%d/%m/%Y %H:%M', data) as data_formatada
+                FROM transacao 
+                WHERE conta_id = ? 
+                ORDER BY data DESC
+            ''', (conta_id,))
             transacoes = cursor.fetchall()
         
         return render_template('extrato.html', conta=conta, transacoes=transacoes)

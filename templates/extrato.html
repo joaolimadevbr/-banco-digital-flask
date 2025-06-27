@@ -63,7 +63,7 @@
                             <tbody>
                                 {% for transacao in transacoes %}
                                     <tr>
-                                        <td>{{ transacao.data.strftime('%d/%m/%Y %H:%M') }}</td>
+                                        <td>{{ transacao.data_formatada }}</td>
                                         <td>
                                             {% if transacao.tipo == 'deposito' %}
                                                 <span class="badge bg-success">
