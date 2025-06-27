@@ -18,35 +18,42 @@ def get_db():
 
 def init_db():
     """Inicializa o banco de dados com as tabelas"""
-    with get_db() as db:
-        db.executescript('''
-            CREATE TABLE IF NOT EXISTS usuario (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nome TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                senha TEXT NOT NULL,
-                saldo REAL DEFAULT 0.0,
-                data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            
-            CREATE TABLE IF NOT EXISTS conta (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                tipo TEXT NOT NULL,
-                saldo REAL DEFAULT 0.0,
-                usuario_id INTEGER NOT NULL,
-                FOREIGN KEY (usuario_id) REFERENCES usuario (id)
-            );
-            
-            CREATE TABLE IF NOT EXISTS transacao (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                tipo TEXT NOT NULL,
-                valor REAL NOT NULL,
-                descricao TEXT,
-                data TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                conta_id INTEGER NOT NULL,
-                FOREIGN KEY (conta_id) REFERENCES conta (id)
-            );
-        ''')
+    try:
+        with get_db() as db:
+            db.executescript('''
+                CREATE TABLE IF NOT EXISTS usuario (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nome TEXT NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    senha TEXT NOT NULL,
+                    saldo REAL DEFAULT 0.0,
+                    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                CREATE TABLE IF NOT EXISTS conta (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tipo TEXT NOT NULL,
+                    saldo REAL DEFAULT 0.0,
+                    usuario_id INTEGER NOT NULL,
+                    FOREIGN KEY (usuario_id) REFERENCES usuario (id)
+                );
+                
+                CREATE TABLE IF NOT EXISTS transacao (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tipo TEXT NOT NULL,
+                    valor REAL NOT NULL,
+                    descricao TEXT,
+                    data TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    conta_id INTEGER NOT NULL,
+                    FOREIGN KEY (conta_id) REFERENCES conta (id)
+                );
+            ''')
+            print("✅ Banco de dados SQLite inicializado com sucesso!")
+    except Exception as e:
+        print(f"❌ Erro ao inicializar banco: {e}")
+
+# Inicializa o banco quando o app é criado
+init_db()
 
 # Rotas
 @app.route('/')
@@ -62,21 +69,34 @@ def registro():
         email = request.form['email']
         senha = request.form['senha']
         
-        with get_db() as db:
-            # Verifica se email já existe
-            cursor = db.execute('SELECT id FROM usuario WHERE email = ?', (email,))
-            if cursor.fetchone():
-                flash('Email já cadastrado!', 'error')
-                return redirect(url_for('registro'))
+        try:
+            with get_db() as db:
+                # Verifica se email já existe
+                cursor = db.execute('SELECT id FROM usuario WHERE email = ?', (email,))
+                if cursor.fetchone():
+                    flash('Email já cadastrado!', 'error')
+                    return redirect(url_for('registro'))
+                
+                # Cria novo usuário
+                senha_hash = generate_password_hash(senha)
+                db.execute('INSERT INTO usuario (nome, email, senha) VALUES (?, ?, ?)',
+                          (nome, email, senha_hash))
+                db.commit()
             
-            # Cria novo usuário
-            senha_hash = generate_password_hash(senha)
-            db.execute('INSERT INTO usuario (nome, email, senha) VALUES (?, ?, ?)',
-                      (nome, email, senha_hash))
-            db.commit()
-        
-        flash('Conta criada com sucesso!', 'success')
-        return redirect(url_for('login'))
+            flash('Conta criada com sucesso!', 'success')
+            return redirect(url_for('login'))
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                # Se a tabela não existe, tenta criar novamente
+                init_db()
+                flash('Erro temporário. Tente novamente.', 'error')
+                return redirect(url_for('registro'))
+            else:
+                flash('Erro no banco de dados!', 'error')
+                return redirect(url_for('registro'))
+        except Exception as e:
+            flash('Erro inesperado!', 'error')
+            return redirect(url_for('registro'))
     
     return render_template('registro.html')
 
@@ -86,17 +106,26 @@ def login():
         email = request.form['email']
         senha = request.form['senha']
         
-        with get_db() as db:
-            cursor = db.execute('SELECT * FROM usuario WHERE email = ?', (email,))
-            usuario = cursor.fetchone()
-            
-            if usuario and check_password_hash(usuario['senha'], senha):
-                session['usuario_id'] = usuario['id']
-                session['usuario_nome'] = usuario['nome']
-                flash('Login realizado com sucesso!', 'success')
-                return redirect(url_for('dashboard'))
+        try:
+            with get_db() as db:
+                cursor = db.execute('SELECT * FROM usuario WHERE email = ?', (email,))
+                usuario = cursor.fetchone()
+                
+                if usuario and check_password_hash(usuario['senha'], senha):
+                    session['usuario_id'] = usuario['id']
+                    session['usuario_nome'] = usuario['nome']
+                    flash('Login realizado com sucesso!', 'success')
+                    return redirect(url_for('dashboard'))
+                else:
+                    flash('Email ou senha incorretos!', 'error')
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                init_db()
+                flash('Erro temporário. Tente novamente.', 'error')
             else:
-                flash('Email ou senha incorretos!', 'error')
+                flash('Erro no banco de dados!', 'error')
+        except Exception as e:
+            flash('Erro inesperado!', 'error')
     
     return render_template('login.html')
 
@@ -111,21 +140,33 @@ def dashboard():
     if 'usuario_id' not in session:
         return redirect(url_for('login'))
     
-    with get_db() as db:
-        # Busca usuário
-        cursor = db.execute('SELECT * FROM usuario WHERE id = ?', (session['usuario_id'],))
-        usuario = cursor.fetchone()
+    try:
+        with get_db() as db:
+            # Busca usuário
+            cursor = db.execute('SELECT * FROM usuario WHERE id = ?', (session['usuario_id'],))
+            usuario = cursor.fetchone()
+            
+            if not usuario:
+                session.clear()
+                flash('Usuário não encontrado!', 'error')
+                return redirect(url_for('login'))
+            
+            # Busca contas do usuário
+            cursor = db.execute('SELECT * FROM conta WHERE usuario_id = ?', (usuario['id'],))
+            contas = cursor.fetchall()
         
-        if not usuario:
-            session.clear()
-            flash('Usuário não encontrado!', 'error')
+        return render_template('dashboard.html', usuario=usuario, contas=contas)
+    except sqlite3.OperationalError as e:
+        if "no such table" in str(e):
+            init_db()
+            flash('Erro temporário. Recarregue a página.', 'error')
             return redirect(url_for('login'))
-        
-        # Busca contas do usuário
-        cursor = db.execute('SELECT * FROM conta WHERE usuario_id = ?', (usuario['id'],))
-        contas = cursor.fetchall()
-    
-    return render_template('dashboard.html', usuario=usuario, contas=contas)
+        else:
+            flash('Erro no banco de dados!', 'error')
+            return redirect(url_for('login'))
+    except Exception as e:
+        flash('Erro inesperado!', 'error')
+        return redirect(url_for('login'))
 
 @app.route('/criar_conta', methods=['GET', 'POST'])
 def criar_conta():
@@ -136,13 +177,24 @@ def criar_conta():
         tipo = request.form['tipo']
         usuario_id = session['usuario_id']
         
-        with get_db() as db:
-            db.execute('INSERT INTO conta (tipo, usuario_id) VALUES (?, ?)',
-                      (tipo, usuario_id))
-            db.commit()
-        
-        flash('Conta criada com sucesso!', 'success')
-        return redirect(url_for('dashboard'))
+        try:
+            with get_db() as db:
+                db.execute('INSERT INTO conta (tipo, usuario_id) VALUES (?, ?)',
+                          (tipo, usuario_id))
+                db.commit()
+            
+            flash('Conta criada com sucesso!', 'success')
+            return redirect(url_for('dashboard'))
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                init_db()
+                flash('Erro temporário. Tente novamente.', 'error')
+            else:
+                flash('Erro no banco de dados!', 'error')
+            return redirect(url_for('dashboard'))
+        except Exception as e:
+            flash('Erro inesperado!', 'error')
+            return redirect(url_for('dashboard'))
     
     return render_template('criar_conta.html')
 
@@ -151,15 +203,23 @@ def deposito(conta_id):
     if 'usuario_id' not in session:
         return redirect(url_for('login'))
     
-    with get_db() as db:
-        # Verifica se a conta pertence ao usuário
-        cursor = db.execute('SELECT * FROM conta WHERE id = ? AND usuario_id = ?',
-                          (conta_id, session['usuario_id']))
-        conta = cursor.fetchone()
-        
-        if not conta:
-            flash('Acesso negado!', 'error')
-            return redirect(url_for('dashboard'))
+    try:
+        with get_db() as db:
+            # Verifica se a conta pertence ao usuário
+            cursor = db.execute('SELECT * FROM conta WHERE id = ? AND usuario_id = ?',
+                              (conta_id, session['usuario_id']))
+            conta = cursor.fetchone()
+            
+            if not conta:
+                flash('Acesso negado!', 'error')
+                return redirect(url_for('dashboard'))
+    except sqlite3.OperationalError as e:
+        if "no such table" in str(e):
+            init_db()
+            flash('Erro temporário. Tente novamente.', 'error')
+        else:
+            flash('Erro no banco de dados!', 'error')
+        return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
         try:
@@ -180,6 +240,14 @@ def deposito(conta_id):
                 flash('Valor deve ser maior que zero!', 'error')
         except ValueError:
             flash('Valor inválido!', 'error')
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                init_db()
+                flash('Erro temporário. Tente novamente.', 'error')
+            else:
+                flash('Erro no banco de dados!', 'error')
+        except Exception as e:
+            flash('Erro inesperado!', 'error')
         
         return redirect(url_for('dashboard'))
     
@@ -190,15 +258,23 @@ def saque(conta_id):
     if 'usuario_id' not in session:
         return redirect(url_for('login'))
     
-    with get_db() as db:
-        # Verifica se a conta pertence ao usuário
-        cursor = db.execute('SELECT * FROM conta WHERE id = ? AND usuario_id = ?',
-                          (conta_id, session['usuario_id']))
-        conta = cursor.fetchone()
-        
-        if not conta:
-            flash('Acesso negado!', 'error')
-            return redirect(url_for('dashboard'))
+    try:
+        with get_db() as db:
+            # Verifica se a conta pertence ao usuário
+            cursor = db.execute('SELECT * FROM conta WHERE id = ? AND usuario_id = ?',
+                              (conta_id, session['usuario_id']))
+            conta = cursor.fetchone()
+            
+            if not conta:
+                flash('Acesso negado!', 'error')
+                return redirect(url_for('dashboard'))
+    except sqlite3.OperationalError as e:
+        if "no such table" in str(e):
+            init_db()
+            flash('Erro temporário. Tente novamente.', 'error')
+        else:
+            flash('Erro no banco de dados!', 'error')
+        return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
         try:
@@ -219,6 +295,14 @@ def saque(conta_id):
                 flash('Valor inválido ou saldo insuficiente!', 'error')
         except ValueError:
             flash('Valor inválido!', 'error')
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                init_db()
+                flash('Erro temporário. Tente novamente.', 'error')
+            else:
+                flash('Erro no banco de dados!', 'error')
+        except Exception as e:
+            flash('Erro inesperado!', 'error')
         
         return redirect(url_for('dashboard'))
     
@@ -229,34 +313,56 @@ def extrato(conta_id):
     if 'usuario_id' not in session:
         return redirect(url_for('login'))
     
-    with get_db() as db:
-        # Verifica se a conta pertence ao usuário
-        cursor = db.execute('SELECT * FROM conta WHERE id = ? AND usuario_id = ?',
-                          (conta_id, session['usuario_id']))
-        conta = cursor.fetchone()
+    try:
+        with get_db() as db:
+            # Verifica se a conta pertence ao usuário
+            cursor = db.execute('SELECT * FROM conta WHERE id = ? AND usuario_id = ?',
+                              (conta_id, session['usuario_id']))
+            conta = cursor.fetchone()
+            
+            if not conta:
+                flash('Acesso negado!', 'error')
+                return redirect(url_for('dashboard'))
+            
+            # Busca transações
+            cursor = db.execute('SELECT * FROM transacao WHERE conta_id = ? ORDER BY data DESC',
+                              (conta_id,))
+            transacoes = cursor.fetchall()
         
-        if not conta:
-            flash('Acesso negado!', 'error')
-            return redirect(url_for('dashboard'))
-        
-        # Busca transações
-        cursor = db.execute('SELECT * FROM transacao WHERE conta_id = ? ORDER BY data DESC',
-                          (conta_id,))
-        transacoes = cursor.fetchall()
-    
-    return render_template('extrato.html', conta=conta, transacoes=transacoes)
+        return render_template('extrato.html', conta=conta, transacoes=transacoes)
+    except sqlite3.OperationalError as e:
+        if "no such table" in str(e):
+            init_db()
+            flash('Erro temporário. Tente novamente.', 'error')
+        else:
+            flash('Erro no banco de dados!', 'error')
+        return redirect(url_for('dashboard'))
+    except Exception as e:
+        flash('Erro inesperado!', 'error')
+        return redirect(url_for('dashboard'))
 
 # Rota de health check para o Render
 @app.route('/health')
 def health_check():
-    return {'status': 'healthy', 'message': 'Banco Digital API está funcionando!'}
+    try:
+        # Testa conexão com banco
+        with get_db() as db:
+            cursor = db.execute('SELECT COUNT(*) as count FROM usuario')
+            user_count = cursor.fetchone()['count']
+        
+        return {
+            'status': 'healthy', 
+            'message': 'Banco Digital API está funcionando!',
+            'database': 'connected',
+            'users_count': user_count
+        }
+    except Exception as e:
+        return {
+            'status': 'error',
+            'message': f'Erro no banco de dados: {str(e)}',
+            'database': 'disconnected'
+        }
 
 if __name__ == '__main__':
-    try:
-        init_db()
-        print("✅ Banco de dados SQLite criado com sucesso!")
-    except Exception as e:
-        print(f"❌ Erro ao criar banco de dados: {e}")
-    
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port) 
