@@ -6,12 +6,16 @@ import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'sua_chave_secreta_aqui')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///banco.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Configuração do banco de dados
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///banco.db')
 
 # Configuração para PostgreSQL no Render
-if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
-    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
@@ -54,7 +58,8 @@ def registro():
         email = request.form['email']
         senha = request.form['senha']
         
-        if Usuario.query.filter_by(email=email).first():
+        # Usando db.session.query() em vez de Model.query
+        if db.session.query(Usuario).filter_by(email=email).first():
             flash('Email já cadastrado!', 'error')
             return redirect(url_for('registro'))
         
@@ -74,7 +79,8 @@ def login():
         email = request.form['email']
         senha = request.form['senha']
         
-        usuario = Usuario.query.filter_by(email=email).first()
+        # Usando db.session.query() em vez de Model.query
+        usuario = db.session.query(Usuario).filter_by(email=email).first()
         if usuario and check_password_hash(usuario.senha, senha):
             session['usuario_id'] = usuario.id
             session['usuario_nome'] = usuario.nome
@@ -97,7 +103,13 @@ def dashboard():
         return redirect(url_for('login'))
     
     usuario = db.session.get(Usuario, session['usuario_id'])
-    contas = Conta.query.filter_by(usuario_id=usuario.id).all()
+    if not usuario:
+        session.clear()
+        flash('Usuário não encontrado!', 'error')
+        return redirect(url_for('login'))
+    
+    # Usando db.session.query() em vez de Model.query
+    contas = db.session.query(Conta).filter_by(usuario_id=usuario.id).all()
     return render_template('dashboard.html', usuario=usuario, contas=contas)
 
 @app.route('/criar_conta', methods=['GET', 'POST'])
@@ -123,22 +135,26 @@ def deposito(conta_id):
     if 'usuario_id' not in session:
         return redirect(url_for('login'))
     
-    conta = Conta.query.get_or_404(conta_id)
+    # Usando db.session.query() em vez de Model.query
+    conta = db.session.query(Conta).get_or_404(conta_id)
     if conta.usuario_id != session['usuario_id']:
         flash('Acesso negado!', 'error')
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
-        valor = float(request.form['valor'])
-        if valor > 0:
-            conta.saldo += valor
-            transacao = Transacao(tipo='deposito', valor=valor, 
-                                 descricao='Depósito', conta_id=conta.id)
-            db.session.add(transacao)
-            db.session.commit()
-            flash('Depósito realizado com sucesso!', 'success')
-        else:
-            flash('Valor deve ser maior que zero!', 'error')
+        try:
+            valor = float(request.form['valor'])
+            if valor > 0:
+                conta.saldo += valor
+                transacao = Transacao(tipo='deposito', valor=valor, 
+                                     descricao='Depósito', conta_id=conta.id)
+                db.session.add(transacao)
+                db.session.commit()
+                flash('Depósito realizado com sucesso!', 'success')
+            else:
+                flash('Valor deve ser maior que zero!', 'error')
+        except ValueError:
+            flash('Valor inválido!', 'error')
         
         return redirect(url_for('dashboard'))
     
@@ -149,22 +165,26 @@ def saque(conta_id):
     if 'usuario_id' not in session:
         return redirect(url_for('login'))
     
-    conta = Conta.query.get_or_404(conta_id)
+    # Usando db.session.query() em vez de Model.query
+    conta = db.session.query(Conta).get_or_404(conta_id)
     if conta.usuario_id != session['usuario_id']:
         flash('Acesso negado!', 'error')
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
-        valor = float(request.form['valor'])
-        if valor > 0 and valor <= conta.saldo:
-            conta.saldo -= valor
-            transacao = Transacao(tipo='saque', valor=valor, 
-                                 descricao='Saque', conta_id=conta.id)
-            db.session.add(transacao)
-            db.session.commit()
-            flash('Saque realizado com sucesso!', 'success')
-        else:
-            flash('Valor inválido ou saldo insuficiente!', 'error')
+        try:
+            valor = float(request.form['valor'])
+            if valor > 0 and valor <= conta.saldo:
+                conta.saldo -= valor
+                transacao = Transacao(tipo='saque', valor=valor, 
+                                     descricao='Saque', conta_id=conta.id)
+                db.session.add(transacao)
+                db.session.commit()
+                flash('Saque realizado com sucesso!', 'success')
+            else:
+                flash('Valor inválido ou saldo insuficiente!', 'error')
+        except ValueError:
+            flash('Valor inválido!', 'error')
         
         return redirect(url_for('dashboard'))
     
@@ -175,15 +195,28 @@ def extrato(conta_id):
     if 'usuario_id' not in session:
         return redirect(url_for('login'))
     
-    conta = Conta.query.get_or_404(conta_id)
+    # Usando db.session.query() em vez de Model.query
+    conta = db.session.query(Conta).get_or_404(conta_id)
     if conta.usuario_id != session['usuario_id']:
         flash('Acesso negado!', 'error')
         return redirect(url_for('dashboard'))
     
-    transacoes = Transacao.query.filter_by(conta_id=conta.id).order_by(Transacao.data.desc()).all()
+    # Usando db.session.query() em vez de Model.query
+    transacoes = db.session.query(Transacao).filter_by(conta_id=conta.id).order_by(Transacao.data.desc()).all()
     return render_template('extrato.html', conta=conta, transacoes=transacoes)
+
+# Rota de health check para o Render
+@app.route('/health')
+def health_check():
+    return {'status': 'healthy', 'message': 'Banco Digital API está funcionando!'}
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
-    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000))) 
+        try:
+            db.create_all()
+            print("✅ Banco de dados criado com sucesso!")
+        except Exception as e:
+            print(f"❌ Erro ao criar banco de dados: {e}")
+    
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port) 

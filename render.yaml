@@ -5,4 +5,19 @@ services:
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
-    envVars
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.16
+      - key: SECRET_KEY
+        generateValue: true
+      # Descomente as linhas abaixo se quiser usar PostgreSQL
+      # - key: DATABASE_URL
+      #   fromDatabase:
+      #     name: banco-digital-db
+      #     property: connectionString
+
+# Descomente o bloco abaixo se quiser criar um banco PostgreSQL
+# databases:
+#   - name: banco-digital-db
+#     databaseName: bancodigital
+#     user: bancodigital
